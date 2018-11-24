@@ -1,0 +1,45 @@
+{
+  "enabled": true,
+  "debug": false,
+  "interval": 60,
+  "hostname": "",
+  "worker_nr": 4,
+  "watcher_type": "poll",
+  "falcon":{
+    "url":"http://127.0.0.1:1988/v1/push",
+    "timeout": 20
+  },
+  "filters" :[
+  {
+    "file": "/tmp/test.log",
+    "rules": [
+      {
+      "index": 1,
+      "include": "ERROR",
+      "exclude": "a",
+      "params":{
+            "metric":"zk_error",
+            "type": "GAUGE",
+            "tags": ["file=/var/log/zookeeper/zookeeper.log"],
+            "value": {
+                "count": 0
+            }
+          }
+      },
+      {
+      "index": 2,
+      "include": "Len error",
+      "exclude": "",
+      "params":{
+          "metric":"zk_len_error",
+          "type": "GAUGE",
+          "tags":["file=/var/log/zookeeper/zookeeper.log"],
+          "value": {
+              "count": 0
+          }
+        }
+      }
+     ]
+  }
+]
+}
