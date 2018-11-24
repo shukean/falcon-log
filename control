@@ -7,7 +7,7 @@ app=falcon-log
 
 mkdir -p log
 pidfile=log/pid
-logfile=log/app.log
+logfile=log/control.log
 
 function check_pid() {
     if [ -f $pidfile ];then

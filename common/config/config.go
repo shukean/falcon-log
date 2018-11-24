@@ -118,7 +118,19 @@ func setTail(filter *Filter, watcher_type string) error {
     if watcher_type == "poll" {
         is_poll = true
     }
-    tail, err := tail.TailFile(filter.File, tail.Config{Follow: true, ReOpen: true, MustExist: false, Poll: is_poll})
+    var seek tail.SeekInfo = tail.SeekInfo {
+        Offset: -1,
+        Whence: os.SEEK_END,
+    }
+    finfo, err := os.Stat(filter.File)
+    if err == nil {
+        seek.Offset = finfo.Size() - 1
+        seek.Whence = os.SEEK_SET
+    } else {
+        log.Fatalf("open file %s failed: %v", filter.File, err)
+    }
+    log.Infof("tail of file set offset %s: %d", filter.File, seek.Offset);
+    tail, err := tail.TailFile(filter.File, tail.Config{Follow: true, ReOpen: true, MustExist: false, Poll: is_poll, Location:&seek})
 	if err != nil {
         return err
 	}

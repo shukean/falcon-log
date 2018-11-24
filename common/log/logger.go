@@ -32,7 +32,7 @@ func init() {
     if _, err := os.Stat(logPath); os.IsNotExist(err) {
         os.Mkdir(logPath, 0755)
     }
-    fp, err := os.OpenFile(logPath + logFile, os.O_RDWR|os.O_CREATE, 0644)
+    fp, err := os.OpenFile(logPath + logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
     if err != nil {
         fmt.Printf("open file %s failed, %s", logFile, err)
         os.Exit(2)
