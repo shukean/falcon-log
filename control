@@ -5,6 +5,7 @@ cd $WORKSPACE
 
 app=falcon-log
 
+mkdir -p log
 pidfile=log/pid
 logfile=log/app.log
 
