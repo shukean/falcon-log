@@ -2,7 +2,6 @@ package log
 
 import (
     "os"
-    "strconv"
     "log"
     "fmt"
     "strings"
@@ -13,10 +12,10 @@ const (
     logFile string = "app.log"
     pidFile string = "pid"
 
-    fDEBUG string = "DEBUG"
-    fINFO  string = "INFO"
-    fERROR string = "ERROR"
-    fFATAL string = "FATAL"
+    fDEBUG string = "[DEBUG]"
+    fINFO  string = "[INFO]"
+    fERROR string = "[ERROR]"
+    fFATAL string = "[FATAL]"
 )
 
 type ykLog struct {
@@ -25,78 +24,111 @@ type ykLog struct {
 }
 
 var (
-    logger ykLog
+    Logger      ykLog
+    LogFp       *os.File
+    PidFp       *os.File
 )
 
 func init() {
+    var err error 
     if _, err := os.Stat(logPath); os.IsNotExist(err) {
         os.Mkdir(logPath, 0755)
     }
-    fp, err := os.OpenFile(logPath + logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+    LogFp, err = os.OpenFile(logPath + logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
     if err != nil {
-        fmt.Printf("open file %s failed, %s", logFile, err)
+        fmt.Printf("open log file:%s failed, err:%s", logFile, err)
         os.Exit(2)
     }
-    pid := os.Getpid()
-    if pid < 1 {
-        fmt.Println("get pid failed")
-        os.Exit(2)
-    }
-    fp2, err := os.OpenFile(logPath + pidFile, os.O_RDWR|os.O_CREATE, 0644)
-    if err != nil {
-        fmt.Printf("open file %s failed, %s", pidFile, err)
-        os.Exit(2)
-    }
-    fp2.Write([]byte(strconv.Itoa(pid)))
-    fp2.Close()
 
-    logger.log = log.New(fp, "", log.LstdFlags|log.Lshortfile)
-    logger.debug = true
+    PidFp, err = os.OpenFile(logPath + pidFile, os.O_RDWR|os.O_CREATE, 0644)
+    if err != nil {
+        fmt.Printf("open pid file:%s failed, err:%s", pidFile, err)
+        os.Exit(2)
+    }
+
+    Logger.log = log.New(LogFp, "", log.LstdFlags|log.Lshortfile)
+    Logger.debug = true
+
 }
 
 func SetDebug(debug bool) {
-    logger.debug = debug
+    Logger.debug = debug
 }
 
-func Logf(level string, format string, args ...interface{}) {
-    if ! logger.debug && level == fDEBUG {
+func Logf(level string, format string, v ...interface{}) {
+    if ! Logger.debug && level == fDEBUG {
         return
     }
-    logger.log.Printf(level + " " + format, args...)
+    Logger.log.Printf(level + format, v...)
 }
 
-func Debug(arg interface{}, args ...interface{}) {
-    Logf(fDEBUG, fmt.Sprint(arg) + strings.Repeat(" %v", len(args)), args...)
+func Debug(v ...interface{}) {
+    Logf(fDEBUG, strings.Repeat(" %v", len(v)), v...)
 }
 
-func Debugf(format string, args ...interface{}) {
-    Logf(fDEBUG, format, args...)
+func Debugf(format string, v ...interface{}) {
+    Logf(fDEBUG, " " + format, v...)
 }
 
-func Info(arg interface{}, args ...interface{}) {
-    Logf(fINFO, fmt.Sprint(arg) + strings.Repeat(" %v", len(args)), args...)
+func Info(v...interface{}) {
+    Logf(fINFO, strings.Repeat(" %v", len(v)), v...)
 }
 
-func Infof(format string, args ...interface{}) {
-    Logf(fINFO, format, args...)
+func Infof(format string, v...interface{}) {
+    Logf(fINFO, " " + format, v...)
 }
 
-func Error(arg interface{}, args ...interface{}) {
-    Logf(fERROR, fmt.Sprint(arg) + strings.Repeat(" %v", len(args)), args...)
+func Error(v ...interface{}) {
+    Logf(fERROR, strings.Repeat(" %v", len(v)), v...)
 }
 
-func Errorf(format string, args ...interface{}) {
-    Logf(fERROR, format, args...)
+func Errorf(format string, v ...interface{}) {
+    Logf(fERROR, " " + format, v ...)
 }
 
-func Fatal(arg interface{}, args ...interface{}) {
-    Logf(fFATAL, fmt.Sprint(arg) + strings.Repeat(" %v", len(args)), args...)
+func Fatal(v ...interface{}) {
+    Logf(fFATAL, strings.Repeat(" %v", len(v)), v...)
 }
 
-func Fatalf(format string, args ...interface{}) {
-    Logf(fFATAL, format, args...)
+func Fatalf(format string, v ...interface{}) {
+    Logf(fFATAL, " " + format, v ...)
 }
 
+func (log *ykLog) Fatal(v ...interface{}) {
+    Fatal(v...)
+}
 
+func (log *ykLog) Fatalf(format string, v ...interface{}) {
+    Fatalf(format, v...)
+}
 
+func (log *ykLog) Fatalln(v ...interface{}) {
+    Fatal(v...)
+}
 
+func (log *ykLog) Panic(v ...interface{}) {
+    Fatal(v...)
+    os.Exit(1)
+}
+
+func (log *ykLog) Panicf(format string, v ...interface{}) {
+    Fatalf(format, v...)
+    os.Exit(1)
+}
+
+func (log *ykLog) Panicln(v ...interface{}) {
+    Fatal(v...)
+    os.Exit(1)
+}
+
+func (log *ykLog) Print(v ...interface{}) {
+    Info(v...);
+}
+
+func (log *ykLog) Printf(format string, v ...interface{}) {
+    Infof(format, v...)
+}
+
+func (log *ykLog) Println(v ...interface{}) {
+    Info(v...)
+}

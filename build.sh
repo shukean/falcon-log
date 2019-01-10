@@ -14,4 +14,3 @@ mkdir -p monitor_logs
 \cp control monitor_logs/
 \cp falcon-log monitor_logs/
 \cp -r conf monitor_logs/
-

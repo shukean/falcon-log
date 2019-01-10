@@ -6,15 +6,15 @@ import (
     "fmt"
     "os"
     "regexp"
-    "errors"
 
     "github.com/hpcloud/tail"
     "github.com/shukean/falcon-log/common/log"
 )
 
 type Falcon struct {
-    Url     string
-    Timeout int
+    Url         string      `json:"url"`
+    Timeout     int         `json:"timeout"`
+    MaxBatchNum int         `json:"max_batch_num"`
 }
 
 type Value struct {
@@ -26,6 +26,11 @@ type Params struct {
     Type        string      `json:"type"`
     Tags        []string    `json:"tags"`
     Value       Value       `json:"value"`
+}
+
+type Alive struct {
+    MultiInterval   int     `json:"multi_interval"`
+    Params          Params  `json:"params"`
 }
 
 type Rule struct {
@@ -41,8 +46,11 @@ type Rule struct {
 
 type Filter struct {
     File    string              `json:"file"`
+    Exists  bool                `json:"exists"`
+    AliveCk Alive               `json:"alive"`
     Rules   []Rule              `json:"rules"`
     Tail    *tail.Tail
+    Key     string
 }
 
 type Config struct {
@@ -71,8 +79,28 @@ type FalconAgentData struct {
     Tags string `json:"tags"` //一组逗号分割的键值对, 对metric进一步描述和细化, 可以是空字符串. 比如idc=lg，比如service=xbox等，多个tag之间用逗号分割
 }
 
+func (params Params) IsEmpty() bool {
+    return params.Metric == "" || params.Type == ""
+}
+
+func (alive Alive) IsEmpty() bool {
+    return alive.MultiInterval < 0 || alive.Params.IsEmpty()
+}
+
+func (rule Rule) IsEmpty() bool {
+    return rule.Index < 0 || rule.Include == "" || rule.Params.IsEmpty()
+}
+
+func (filter Filter) IsEmpty() bool {
+    return filter.File == ""
+}
+
+func (falcon Falcon) IsEmpty() bool {
+    return falcon.Url == ""
+}
 
 const configFile = "./conf/cfg.json"
+const maxFalconPushBatchNum = 10
 
 var (
     Cfg     *Config
@@ -86,13 +114,18 @@ func CheckConfig(config *Config) error {
         }
     }
     for i, f := range config.Filters {
+        if f.IsEmpty() {
+            log.Logger.Panicf("filter file is empty")
+        }
         if _, err = os.Stat(f.File); err != nil {
-            log.Fatalf("filter: %d file not exist %s", f.File, i)
-            return err
+            log.Infof("filter:%d monitor file:%s not exists", i, f.File)
+            if f.Exists {
+                return err
+            }
         }
         for j, r := range f.Rules {
-            if r.Include == "" {
-                return errors.New("rule include is empty")
+            if r.IsEmpty() {
+                return fmt.Errorf("fileter:%s rule:%d check failed", f.File, r.Index)
             }
             if config.Filters[i].Rules[j].RegexInclude, err = regexp.Compile(r.Include); err != nil {
                 return err
@@ -102,35 +135,45 @@ func CheckConfig(config *Config) error {
                     return err
                 }
             }
-            config.Filters[i].Rules[j].Key = fmt.Sprintf("k%d-%d", i, r.Index)
+            config.Filters[i].Rules[j].Key = fmt.Sprintf("rk%d-%d", i, r.Index)
         }
         if err = setTail(&config.Filters[i], config.WatcherType); err != nil {
             return err
         }
+        config.Filters[i].Key = fmt.Sprintf("fk%d", i)
     }
-
+    if config.Falcon.MaxBatchNum <= 0 {
+        config.Falcon.MaxBatchNum = maxFalconPushBatchNum
+    }
+    log.Infof("falcon config:%v", config.Falcon)
     // todo
     return nil
 }
 
 func setTail(filter *Filter, watcher_type string) error {
-    is_poll := false
-    if watcher_type == "poll" {
-        is_poll = true
-    }
-    var seek tail.SeekInfo = tail.SeekInfo {
-        Offset: -1,
+    seek := tail.SeekInfo {
+        Offset: 0,
         Whence: os.SEEK_END,
     }
     finfo, err := os.Stat(filter.File)
     if err == nil {
-        seek.Offset = finfo.Size() - 1
+        if finfo.Size() > 0 {
+            seek.Offset = finfo.Size()
+        }
         seek.Whence = os.SEEK_SET
     } else {
-        log.Fatalf("open file %s failed: %v", filter.File, err)
+        log.Fatalf("stat file:%s failed, err:%v", filter.File, err)
     }
-    log.Infof("tail of file set offset %s: %d", filter.File, seek.Offset);
-    tail, err := tail.TailFile(filter.File, tail.Config{Follow: true, ReOpen: true, MustExist: false, Poll: is_poll, Location:&seek})
+    log.Infof("tail of file:%s set offset:%d", filter.File, seek.Offset);
+    cfg := tail.Config {
+        Follow: true,
+        ReOpen: true,
+        MustExist: false,
+        Poll: watcher_type == "poll",
+        Location: &seek,
+        Logger: &log.Logger,
+    }
+    tail, err := tail.TailFile(filter.File, cfg)
 	if err != nil {
         return err
 	}
@@ -146,12 +189,12 @@ func ReadConfig(file string) (*Config, error) {
     }
     var config *Config;
     if err := json.Unmarshal(bytes, &config); err != nil {
-        log.Fatalf("json Unmarshal failed, ", err)
+        log.Fatalf("json Unmarshal failed, err:%s", err)
         return nil, err
     }
 
     if err := CheckConfig(config); err != nil {
-        log.Fatalf("check config failed ", err)
+        log.Fatalf("check config failed, err:%s ", err)
         return nil, err
     }
 
@@ -163,7 +206,7 @@ func init() {
     var err error
     Cfg, err = ReadConfig(configFile)
     if err != nil {
-        log.Errorf("ERROR: read config failed")
+        log.Fatalf("read config failed:%s", err)
         os.Exit(2)
     }
 }

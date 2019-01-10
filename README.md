@@ -14,12 +14,23 @@ log monitor and send msg to falcon v1 agent
 "watcher_type": "poll",         监控文件的方式，centos 建议为空， macos 调试使用 poll
 "falcon":{
    "url":"http://127.0.0.1:1988/v1/push",              falcon agent 监听http 的端口
+   "timeout": 20,                                       连接 falcon 的超时时间
+   "max_batch_num": 10                                 一次推送最大合并发送规则数量
    "timeout": 20                                       连接 falcon 的超时时间
 },
 
 "filters" :[
   {
     "file": "/tmp/test.log",              需要监控的日志文件名，不存在会报错
+    "alive": {                            文件探活, 检查日志是否有滚动
+      "multi_interval": 3,                推送间隔数,即多个个采集周期
+      "params": {
+         "metric":"zk_alive",
+         "type": "GAUGE",
+         "tags":[],
+         "value": {"count": 0}
+      }
+    },
     "rules": [
       {
       "index": 1,                         规则序号
