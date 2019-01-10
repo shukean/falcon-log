@@ -1,6 +1,6 @@
 # falcon-log
 log monitor and send msg to falcon v1 agent  
-由于监控日志文件关键字，并统计次数后行 falocn agent 报告的工具  
+由于监控日志文件关键字，并统计次数后向 falocn agent 报告的工具  
 
 ## config 配置
 具体配置参见 conf/cfg.json 文件格式  
@@ -16,13 +16,12 @@ log monitor and send msg to falcon v1 agent
    "url":"http://127.0.0.1:1988/v1/push",              falcon agent 监听http 的端口
    "timeout": 20,                                       连接 falcon 的超时时间
    "max_batch_num": 10                                 一次推送最大合并发送规则数量
-   "timeout": 20                                       连接 falcon 的超时时间
 },
 
 "filters" :[
   {
     "file": "/tmp/test.log",              需要监控的日志文件名，不存在会报错
-    "alive": {                            文件探活, 检查日志是否有滚动
+    "alive": {                            文件探活, 检查日志是否有滚动, 可以不设置
       "multi_interval": 3,                推送间隔数,即多个个采集周期
       "params": {
          "metric":"zk_alive",
