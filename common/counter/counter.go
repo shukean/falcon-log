@@ -1,10 +1,9 @@
 package counter
 
 import (
-    "github.com/streamrail/concurrent-map"
+	"github.com/streamrail/concurrent-map"
 )
 
 func NewConcurrentMap() cmap.ConcurrentMap {
-    return cmap.New()
+	return cmap.New()
 }
-

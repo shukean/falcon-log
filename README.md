@@ -15,14 +15,15 @@ log monitor and send msg to falcon v1 agent
 "falcon":{
    "url":"http://127.0.0.1:1988/v1/push",              falcon agent 监听http 的端口
    "timeout": 20,                                       连接 falcon 的超时时间
-   "max_batch_num": 10                                 一次推送最大合并发送规则数量
+   "max_batch_num": 10                                 一次推送最大合并发送规则数量, 默认为10
 },
 
 "filters" :[
   {
-    "file": "/tmp/test.log",              需要监控的日志文件名，不存在会报错
+    "file": "/tmp/test.log",              需要监控的日志文件, 文件名唯一
+    "exists": false,                      为 true 是表示文件需要先存在, 默认为 false, 可以不设置
     "alive": {                            文件探活, 检查日志是否有滚动, 可以不设置
-      "multi_interval": 3,                推送间隔数,即多个个采集周期
+      "multi_interval": 3,                推送间隔数,即采集周期个数
       "params": {
          "metric":"zk_alive",
          "type": "GAUGE",
@@ -32,9 +33,9 @@ log monitor and send msg to falcon v1 agent
     },
     "rules": [
       {
-      "index": 1,                         规则序号
-      "include": "ERROR",                 配置字符，支持 go 正则
-      "exclude": "a",                     匹配后，过滤字符，支持 go 正则，类似： grep -v
+      "index": 1,                         规则序号, 一个 filter 内需要唯一
+      "include": "ERROR",                 配置字符，支持 go 正则, 不可为空
+      "exclude": "a",                     匹配后，过滤字符，支持 go 正则，类似： grep -v, 可以为空
       "params":{
             "metric":"zk_error",          falcon 报警字段
             "type": "GAUGE",              falcon 报警值规则
@@ -44,6 +45,8 @@ log monitor and send msg to falcon v1 agent
             }
           }
       },
-      如果有多组 rule
-   可以有多组 filter
+      {}, {}                              可以有多组 rule
+   ],
+  {}, {}, {}                              可以有多组 filter
+]
 ```
