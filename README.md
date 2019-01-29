@@ -1,9 +1,13 @@
 # falcon-log
 log monitor and send msg to falcon v1 agent  
-由于监控日志文件关键字，并统计次数后向 falocn agent 报告的工具  
+用于监控日志文件关键字，并统计次数后向 falocn agent 报告的工具  
 
 ## config 配置
 具体配置参见 conf/cfg.json 文件格式  
+**注意事项**  
+1. 同一个file的规则需要写在一起,否则无法启动  
+2. 不同文件但是相同的 metric 时,注意需要用tags区分  
+3. 尽量去掉不必要的文件监控,以减少推送的数据  
 
 ```
 "enabled": true,     目前该值没有作用
@@ -17,7 +21,7 @@ log monitor and send msg to falcon v1 agent
    "timeout": 20,                                       连接 falcon 的超时时间
    "max_batch_num": 10                                 一次推送最大合并发送规则数量, 默认为10
 },
-
+"load_extensions": true,                              加载扩容的规则
 "filters" :[
   {
     "file": "/tmp/test.log",              需要监控的日志文件, 文件名唯一
@@ -49,4 +53,25 @@ log monitor and send msg to falcon v1 agent
    ],
   {}, {}, {}                              可以有多组 filter
 ]
+```
+
+#### 扩展规则
+```
+[
+  {
+    "file": "/tmp/test.log",              需要监控的日志文件, 文件名唯一
+    "exists": false,                      为 true 是表示文件需要先存在, 默认为 false, 可以不设置
+    "alive": {                            文件探活, 检查日志是否有滚动, 可以不设置
+      "multi_interval": 3,                推送间隔数,即采集周期个数
+      "params": {
+         "metric":"zk_alive",
+         "type": "GAUGE",
+         "tags":[],
+         "value": {"count": 0}
+      }
+    },
+    "rules": []
+  }
+]
+
 ```

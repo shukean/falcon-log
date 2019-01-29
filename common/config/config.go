@@ -54,14 +54,15 @@ type Filter struct {
 }
 
 type Config struct {
-	Enabled     bool     `json:"enabled"`
-	Debug       bool     `json:"debug"`
-	Interval    int      `json:"interval"`
-	Host        string   `json:"hostname"`
-	Falcon      Falcon   `json:"falcon"`
-	Filters     []Filter `json:"filters"`
-	WorkerNr    int      `json:"worker_nr"`    // send falcon worker nr
-	WatcherType string   `json:"watcher_type"` // poll or inotify
+	Enabled        bool     `json:"enabled"`
+	Debug          bool     `json:"debug"`
+	Interval       int      `json:"interval"`
+	Host           string   `json:"hostname"`
+	Falcon         Falcon   `json:"falcon"`
+	LoadExtentions bool     `json:"load_extensions"`
+	Filters        []Filter `json:"filters"`
+	WorkerNr       int      `json:"worker_nr"`    // send falcon worker nr
+	WatcherType    string   `json:"watcher_type"` // poll or inotify
 }
 
 type FalconAgentData struct {
@@ -99,7 +100,8 @@ func (falcon Falcon) IsEmpty() bool {
 	return falcon.Url == ""
 }
 
-const configFile = "./conf/cfg.json"
+const configDir = "./conf"
+const configFile = "cfg.json"
 const maxFalconPushBatchNum = 10
 
 var (
@@ -113,6 +115,7 @@ func CheckConfig(config *Config) error {
 			return err
 		}
 	}
+	var cfgs = make(map[string]int)
 	for i, f := range config.Filters {
 		if f.IsEmpty() {
 			log.Logger.Panicf("filter file is empty")
@@ -141,11 +144,22 @@ func CheckConfig(config *Config) error {
 			return err
 		}
 		config.Filters[i].Key = fmt.Sprintf("fk%d", i)
+
+		if _, ok := cfgs[f.File]; !ok {
+			cfgs[f.File] = 0
+		} else {
+			cfgs[f.File] += 1
+		}
+	}
+	for cfg_name, cfg_nr := range cfgs {
+		if cfg_nr > 0 {
+			return fmt.Errorf("monitor file:%s appear in multiple config files", cfg_name)
+		}
 	}
 	if config.Falcon.MaxBatchNum <= 0 {
 		config.Falcon.MaxBatchNum = maxFalconPushBatchNum
 	}
-	log.Infof("falcon config:%v", config.Falcon)
+	log.Infof("falcon config:%v, files nr:%d", config.Falcon, len(config.Filters))
 	// todo
 	return nil
 }
@@ -182,7 +196,8 @@ func setTail(filter *Filter, watcher_type string) error {
 }
 
 func ReadConfig(file string) (*Config, error) {
-	bytes, err := ioutil.ReadFile(configFile)
+	log.Infof("load base config:%s", file)
+	bytes, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
@@ -191,21 +206,56 @@ func ReadConfig(file string) (*Config, error) {
 		log.Fatalf("json Unmarshal failed, err:%s", err)
 		return nil, err
 	}
-
-	if err := CheckConfig(config); err != nil {
-		log.Fatalf("check config failed, err:%s ", err)
-		return nil, err
-	}
-
-	log.Infof("config init success, start to work ...")
 	return config, nil
+}
+
+func loadExtentions(dir string) error {
+	files, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	for _, f := range files {
+		if f.Name() == configFile {
+			continue
+		}
+		log.Infof("load config extentions:%s", f.Name())
+		file := fmt.Sprintf("%s/%s", configDir, f.Name())
+		bytes, err := ioutil.ReadFile(file)
+		if err != nil {
+			return err
+		}
+		var extfilters []Filter
+		if err := json.Unmarshal(bytes, &extfilters); err != nil {
+			return err
+		}
+		for _, filter := range extfilters {
+			//check
+			Cfg.Filters = append(Cfg.Filters, filter)
+		}
+	}
+	return nil
 }
 
 func init() {
 	var err error
-	Cfg, err = ReadConfig(configFile)
+	var base_cfg_file = fmt.Sprintf("%s/%s", configDir, configFile)
+	Cfg, err = ReadConfig(base_cfg_file)
 	if err != nil {
 		log.Fatalf("read config failed:%s", err)
 		os.Exit(2)
 	}
+	if Cfg.LoadExtentions {
+		err = loadExtentions(configDir)
+		if err != nil {
+			log.Fatalf("load extenstions failed:%s", err)
+			os.Exit(2)
+		}
+	}
+
+	if err := CheckConfig(Cfg); err != nil {
+		log.Fatalf("check config failed, err:%s ", err)
+		os.Exit(2)
+	}
+
+	log.Infof("config init success, start to work ...")
 }
