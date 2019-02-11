@@ -1,6 +1,6 @@
 # falcon-log
 log monitor and send msg to falcon v1 agent  
-用于监控日志文件关键字，并统计次数后向 falocn agent 报告的工具  
+是一个用于监控日志文件关键字，统计采集周期内出现的次数, 向 falocn agent 报告的工具  
 
 ## config 配置
 具体配置参见 conf/cfg.json 文件格式  
@@ -21,7 +21,7 @@ log monitor and send msg to falcon v1 agent
    "timeout": 20,                                       连接 falcon 的超时时间
    "max_batch_num": 10                                 一次推送最大合并发送规则数量, 默认为10
 },
-"load_extensions": true,                              加载扩容的规则
+"load_extensions": true,                              加载扩展的规则, 即conf目录下非cfg.json的其他规则文件
 "filters" :[
   {
     "file": "/tmp/test.log",              需要监控的日志文件, 文件名唯一
