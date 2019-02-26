@@ -37,7 +37,9 @@ type Rule struct {
 	Index        int    `json:"index"`
 	Include      string `json:"include"`
 	Exclude      string `json:"exclude"`
+	SendType     string `json:"send_type"`
 	Params       Params `json:"params"`
+	Cmd          string `json:"cmd"`
 	RegexInclude *regexp.Regexp
 	RegexExclude *regexp.Regexp
 	Key          string
@@ -89,7 +91,17 @@ func (alive Alive) IsEmpty() bool {
 }
 
 func (rule Rule) IsEmpty() bool {
-	return rule.Index < 0 || rule.Include == "" || rule.Params.IsEmpty()
+	if rule.Index < 0 || rule.Include == "" {
+		return true
+	}
+	if rule.SendType == "" || rule.SendType == SendTypeFalcon {
+		return rule.Params.IsEmpty()
+	} else if rule.SendType == SendTypeCommand {
+		return rule.Cmd == ""
+	} else {
+		log.Fatalf("rule:%s type is unknow", rule.Index)
+		return true
+	}
 }
 
 func (filter Filter) IsEmpty() bool {
@@ -103,6 +115,9 @@ func (falcon Falcon) IsEmpty() bool {
 const configDir = "./conf"
 const configFile = "cfg.json"
 const maxFalconPushBatchNum = 10
+
+const SendTypeFalcon = "falcon"
+const SendTypeCommand = "command"
 
 var (
 	Cfg *Config
@@ -127,6 +142,11 @@ func CheckConfig(config *Config) error {
 			}
 		}
 		for j, r := range f.Rules {
+			//fix
+			if r.SendType == "" {
+				r.SendType = SendTypeFalcon
+				config.Filters[i].Rules[j].SendType = SendTypeFalcon
+			}
 			if r.IsEmpty() {
 				return fmt.Errorf("fileter:%s rule:%d check failed", f.File, r.Index)
 			}

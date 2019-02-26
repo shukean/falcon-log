@@ -12,10 +12,10 @@ log monitor and send msg to falcon v1 agent
 ```
 "enabled": true,     目前该值没有作用
 "debug": false,      开启 debug 日志级别，用于调试，线上建议关闭
-"interval": 60,      采集周期，则间隔多少秒上 falcon 汇报一次
+"interval": 60,      采集周期，则间隔多少秒向 falcon 汇报一次
 "hostname": "",      如果不配置，则自动获取机器名， 用于 falcon 汇报参数
 "worker_nr": 4,      向 falcon 发送的排队数量
-"watcher_type": "poll",         监控文件的方式，centos 建议为空， macos 调试使用 poll
+"watcher_type": "",         监控文件的方式，centos 建议为空， macos 调试使用 poll
 "falcon":{
    "url":"http://127.0.0.1:1988/v1/push",              falcon agent 监听http 的端口
    "timeout": 20,                                       连接 falcon 的超时时间
@@ -27,7 +27,7 @@ log monitor and send msg to falcon v1 agent
     "file": "/tmp/test.log",              需要监控的日志文件, 文件名唯一
     "exists": false,                      为 true 是表示文件需要先存在, 默认为 false, 可以不设置
     "alive": {                            文件探活, 检查日志是否有滚动, 可以不设置
-      "multi_interval": 3,                推送间隔数,即采集周期个数
+      "multi_interval": 3,                推送间隔数,即采集周期个数, 如果在指定的采集周期内没有新日志,则推送0, 否则推送非0
       "params": {
          "metric":"zk_alive",
          "type": "GAUGE",
@@ -48,6 +48,13 @@ log monitor and send msg to falcon v1 agent
                 "count": 0                 这里扩展用。。。
             }
           }
+      },
+      {
+      "index": 2,                         规则序号, 一个 filter 内需要唯一
+      "include": "ERROR",                 配置字符，支持 go 正则, 不可为空
+      "exclude": "a",                     匹配后，过滤字符，支持 go 正则，类似： grep -v, 可以为空
+      "send_type" : "command",            当匹配时执行指定的外部程序(阻塞模式)
+      "cmd": "/bin/sh you_path_shell.sh"  执行程序的路径, 最后一个参数为匹配的字符串(参数以空格分隔)
       },
       {}, {}                              可以有多组 rule
    ],

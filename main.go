@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
@@ -52,12 +53,15 @@ type counterItem struct {
 func watcherLog(filter *config.Filter) {
 	log.Infof("filter file:%s, contain rules count:%d", filter.File, len(filter.Rules))
 	for _, rule := range filter.Rules {
-		item := counterItem{
-			ItemType: kRule,
-			RuleItem: ruleItem{key: rule.Key, num: count_default, rule: rule},
+		if rule.SendType == config.SendTypeFalcon {
+			item := counterItem{
+				ItemType: kRule,
+				RuleItem: ruleItem{key: rule.Key, num: count_default, rule: rule},
+			}
+			counters.Set(rule.Key, item)
 		}
-		counters.Set(rule.Key, item)
-		log.Infof("filter file:%s, rule key:%s idx:%d, include key:\"%s\", exclude key:\"%s\"", filter.File, rule.Key, rule.Index, rule.Include, rule.Exclude)
+		log.Infof("filter file:%s, rule key:%s idx:%d (%s), include key:\"%s\", exclude key:\"%s\"",
+			filter.File, rule.Key, rule.Index, rule.SendType, rule.Include, rule.Exclude)
 	}
 	if !filter.AliveCk.IsEmpty() {
 		item := counterItem{
@@ -101,7 +105,7 @@ func checkLog(content string, filter *config.Filter) {
 		if len(matchs) > 1 {
 			if val, err = strconv.ParseFloat(matchs[1], 64); err != nil {
 				log.Debugf("strconv failed, %s", matchs[1])
-				continue
+				val = 1
 			}
 		}
 		log.Debugf("filter file:%s, rule idx:%d, include key:\"%s\" matched log content:%s successed, matchs:%v", filter.File, rule.Index, rule.Include, content, matchs)
@@ -111,12 +115,27 @@ func checkLog(content string, filter *config.Filter) {
 				continue
 			}
 		}
-		if v, ok := counters.Get(rule.Key); ok {
-			item := v.(counterItem)
-			item.RuleItem.num += val
-			counters.Set(rule.Key, item)
+		if rule.SendType == config.SendTypeFalcon {
+			if v, ok := counters.Get(rule.Key); ok {
+				item := v.(counterItem)
+				item.RuleItem.num += val
+				counters.Set(rule.Key, item)
+			} else {
+				log.Logger.Panicf("rule key:%s count msg not exists in counter", rule.Key)
+			}
+		} else if rule.SendType == config.SendTypeCommand {
+			argv := strings.Split(rule.Cmd, " ")
+			argv = append(argv, content)
+			cmd := exec.Command(argv[0], argv[1:]...)
+			cmd.Env = append(os.Environ())
+			out, err := cmd.Output()
+			if err != nil {
+				log.Fatalf("exec command:%s faild:%s, err:%s", rule.Cmd, out, err)
+			} else {
+				log.Infof("exec command:%s result:%s", rule.Cmd, out)
+			}
 		} else {
-			log.Logger.Panicf("rule key:%s count msg not exists in counter", rule.Key)
+			log.Logger.Panicf("rule key:%s type:%s is out of range", rule.Key, rule.SendType)
 		}
 	}
 }
@@ -253,6 +272,7 @@ func main() {
 		log.Fatal("get pid failed")
 		os.Exit(2)
 	}
+	log.PidFp.Truncate(0)
 	log.PidFp.Write([]byte(strconv.Itoa(pid)))
 
 	go func() {
